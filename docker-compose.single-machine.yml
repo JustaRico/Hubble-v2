@@ -71,6 +71,23 @@ services:
     networks:
       - hubble-net
 
+  # ── Phase 6: DSH orchestrator (containerized) ────────────────────────────
+  dsh-instance:
+    image: hubble/dsh:latest
+    container_name: hubble-dsh
+    restart: unless-stopped
+    ports:
+      - "${HUBBLE_DSH_PORT:-3080}:80"
+    environment:
+      - DSH_HOME=/data/dsh-home
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - DSH_BASIC_AUTH_B64=${DSH_BASIC_AUTH_B64}
+    volumes:
+      - ./data/dsh-home:/data/dsh-home
+    networks:
+      - hubble-net
+
 networks:
   hubble-net:
     driver: bridge

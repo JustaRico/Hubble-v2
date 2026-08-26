@@ -1,0 +1,33 @@
+# Hubble DSH front door.
+#
+# DSH's /api browser-trust fence pins privileged APIs (settings, credentials,
+# host.pickDirectory) to loopback Host authorities. Caddy therefore presents
+# itself to DSH as the loopback proxy: header_up Host 127.0.0.1:3081 on ALL
+# routes — the same delegation the community reference performs for
+# AUTH_MODE=none, but gated here by basic auth so it is not anonymous.
+#
+# basic_auth expects the BASE64 encoding of the bcrypt hash (Caddy decodes it
+# internally before bcrypt-verifying); DSH_BASIC_AUTH_B64 supplies exactly that.
+#
+# WebSocket upgrades (/api/events.*) are proxied transparently by Caddy.
+
+{
+	admin off
+	auto_https off
+}
+
+:80 {
+	basic_auth {
+		hubble {$DSH_BASIC_AUTH_B64}
+	}
+
+	@healthz path /healthz
+	route @healthz {
+		respond "ok" 200
+	}
+
+	reverse_proxy 127.0.0.1:3081 {
+		header_up Host 127.0.0.1:3081
+		header_up -Authorization
+	}
+}
