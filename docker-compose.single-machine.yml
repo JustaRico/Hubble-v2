@@ -71,6 +71,57 @@ services:
     networks:
       - hubble-net
 
+  # ── Phase 5: Wake Gateway ──────────────────────────────────────────────
+  wake-gateway:
+    build:
+      context: ./services/wake-gateway
+      dockerfile: Dockerfile
+    image: hubble/wake-gateway:latest
+    container_name: hubble-wake-gw
+    restart: unless-stopped
+    ports:
+      - "${WAKE_GW_PORT:-8811}:8811"
+    environment:
+      - WAKE_GW_PORT=8811
+      - SAME_HOST_MODE=${SAME_HOST_MODE:-true}
+      - WORKSTATION_MAC=${WORKSTATION_MAC:-}
+      - WORKSTATION_BROADCAST=${WORKSTATION_BROADCAST:-255.255.255.255}
+      - WOL_PORT=${WOL_PORT:-9}
+      - LLAMA_SWAP_TARGET=http://host.docker.internal:10123
+      - SEARXNG_TARGET=http://hubble-searxng:8080
+      - FIRECRAWL_TARGET=http://host.docker.internal:3002
+      - MCPHUB_TARGET=http://hubble-mcphub:3000
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - hubble-net
+
+  # ── Phase 8: Escalation Plugin (privacy gate) ────────────────────────────
+  escalation:
+    build:
+      context: ./services/escalation
+      dockerfile: Dockerfile
+    image: hubble/escalation:latest
+    container_name: hubble-escalation
+    restart: unless-stopped
+    ports:
+      - "${HUBBLE_ESCALATION_PORT:-8812}:8812"
+    environment:
+      - HUBBLE_ESCALATION_PORT=8812
+      - LITELLM_URL=http://hubble-litellm:4000/v1
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - HUBBLE_PI_MODEL=${HUBBLE_PI_MODEL:-pi-model}
+      - HUBBLE_APPROVAL_TIMEOUT_MS=${HUBBLE_APPROVAL_TIMEOUT_MS:-120000}
+      - HUBBLE_PI_HISTORY_WINDOW=${HUBBLE_PI_HISTORY_WINDOW:-8}
+      - HUBBLE_ALLOW_TEST_CONTROLS=${HUBBLE_ALLOW_TEST_CONTROLS:-false}
+      - AUDIT_DIR=/app/data/audit
+    volumes:
+      - ./data/audit:/app/data/audit
+    depends_on:
+      - litellm-gateway
+    networks:
+      - hubble-net
+
   # ── Phase 6: DSH orchestrator (containerized) ────────────────────────────
   dsh-instance:
     image: hubble/dsh:latest
