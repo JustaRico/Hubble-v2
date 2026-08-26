@@ -1,0 +1,11 @@
+{
+  "name": "hubble-file-scanner",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hubble Phase 4 file-scanner MCP tool (stdio), aggregated by MCPHub",
+  "main": "index.mjs",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.0"
+  }
+}

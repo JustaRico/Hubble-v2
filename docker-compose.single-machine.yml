@@ -41,6 +41,36 @@ services:
     networks:
       - hubble-net
 
+  # ── Phase 4: workstation auxiliary services ──────────────────────────────
+  searxng:
+    image: searxng/searxng:latest
+    container_name: hubble-searxng
+    restart: unless-stopped
+    ports:
+      - "${SEARXNG_PORT:-8180}:8080"
+    volumes:
+      - ./config/searxng:/etc/searxng:ro
+    networks:
+      - hubble-net
+
+  mcphub:
+    image: samanhappy/mcphub:latest
+    container_name: hubble-mcphub
+    restart: unless-stopped
+    depends_on:
+      - copyparty-dmz
+    ports:
+      - "${MCPHUB_PORT:-13100}:3000"
+    environment:
+      - MCPHUB_CONFIG=/app/mcp_settings.json
+      - JWT_SECRET=${MCPHUB_JWT_SECRET}
+    volumes:
+      - ./config/mcphub/mcp_settings.json:/app/mcp_settings.json
+      - ./plugins/file-scanner-mcp:/app/scanner:ro
+      - ./data/dmz:/data/dmz:ro
+    networks:
+      - hubble-net
+
 networks:
   hubble-net:
     driver: bridge

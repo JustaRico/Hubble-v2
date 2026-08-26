@@ -1,0 +1,8 @@
+use_default_settings: true
+search:
+  formats:
+    - html
+    - json
+server:
+  secret_key: "hubble-single-machine-dev-secret"
+  limiter: false   # internal service behind the Wake Gateway; not public
