@@ -1,0 +1,34 @@
+# Hubble LiteLLM gateway — one model-access point for every Hubble plugin.
+# Aliases (spec section 7): assistant-model, pi-model; bureau aliases join in
+# Phase 10/11. Nothing talks to OpenRouter or llama-swap directly.
+
+model_list:
+  # ── cloud: DeepSeek-V4-Flash via OpenRouter ─────────────────────────────
+  - model_name: assistant-model
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4-flash
+      api_key: os.environ/OPENROUTER_API_KEY
+
+  # ── local: PI / local-builder tier via the existing llama-swap ──────────
+  - model_name: pi-model
+    litellm_params:
+      model: openai/gemma4-12b
+      api_base: os.environ/LITELLM_LLAMA_SWAP_URL_V1
+      api_key: none
+  - model_name: designer-local
+    litellm_params:
+      model: openai/gemma4-12b
+      api_base: os.environ/LITELLM_LLAMA_SWAP_URL_V1
+      api_key: none
+  - model_name: embed-local
+    litellm_params:
+      model: openai/qwen3-embed
+      api_base: os.environ/LITELLM_LLAMA_SWAP_URL_V1
+      api_key: none
+
+litellm_settings:
+  # audit trail: every call logged with model + tokens (spec: "audit logging")
+  set_verbose: false
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY
