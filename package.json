@@ -1,0 +1,10 @@
+{
+  "name": "hubble-v2",
+  "version": "2.0.0",
+  "private": true,
+  "description": "Hubble 2.0 — multi-tier agent infrastructure (single-machine build)",
+  "type": "module",
+  "scripts": {
+    "test": "bash tests/run_tests.sh"
+  }
+}

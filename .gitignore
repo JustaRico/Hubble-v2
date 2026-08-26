@@ -1,0 +1,7 @@
+# Hubble build/test artifacts
+temp/
+data/
+node_modules/
+*.log
+.env
+tools/jq.exe

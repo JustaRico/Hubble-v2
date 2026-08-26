@@ -1,0 +1,30 @@
+# Hubble 2.0 — single-machine stack (grown phase by phase).
+# Every service sits on the hubble-net bridge so later phases talk to services
+# by name, not localhost — that is what makes the multi-machine split a config
+# change instead of a rewrite.
+
+services:
+  # ── Phase 1: shared DMZ ──────────────────────────────────────────────────
+  copyparty-dmz:
+    image: copyparty/ac:latest
+    container_name: hubble-copyparty-dmz
+    restart: unless-stopped
+    ports:
+      - "${DMZ_PORT:-13923}:3923"
+    volumes:
+      - ./data/dmz:/mnt/storage/shared-dmz
+    # single share at /dmz; read+write for the hubble account, nothing anonymous
+    command:
+      - "-a"
+      - "hubble:${DMZ_PASS}"
+      - "-v"
+      - "/mnt/storage/shared-dmz:/dmz:rwd,hubble"
+    networks:
+      - hubble-net
+
+networks:
+  hubble-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${HUBBLE_NET_SUBNET:-172.31.99.0/24}
