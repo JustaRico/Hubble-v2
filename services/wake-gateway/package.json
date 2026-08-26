@@ -1,0 +1,15 @@
+{
+  "name": "hubble-wake-gateway",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hubble Wake Gateway — streaming-safe reverse proxy with machine-level wake coalescing",
+  "main": "src/server.mjs",
+  "scripts": {
+    "start": "node src/server.mjs",
+    "check": "node --check src/server.mjs && node --check src/wake.mjs && node --check src/config.mjs"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}
