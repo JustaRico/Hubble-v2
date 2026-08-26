@@ -1,0 +1,36 @@
+# Hubble Assistant Agent plugin (Phase 7)
+#
+# Wires the DSH agent to LiteLLM's `assistant-model` alias for ordinary chat
+# and registers the `request_private_data(reason, data_requested)` tool that
+# Phase 8's Escalation Plugin handles.
+#
+# This is a composition patch (cordis.patch.yml), not a dynamic plugin: it is
+# part of the profile's permanent layer, mounted via dsh.profile.bundles.
+
+# ── default model: route ordinary chat through LiteLLM ──────────────────────
+- id: agent-default-model
+  config:
+    provider: hubble-openrouter
+    model: deepseek/deepseek-v4-flash
+
+# ── Hubble escalation tool stub (Phase 8 replaces the handler) ──────────────
+- insert:
+    - id: hubble-escalation-tool
+      name: '@deepseek-ai/dsh-dynamic-tool-host'
+      config:
+        tools:
+          - name: request_private_data
+            description: >
+              Request access to private user data when the answer genuinely
+              requires it. Provide a short reason and what data you need. The
+              request is evaluated by a privacy gate before any data is used.
+            parameters:
+              type: object
+              properties:
+                reason:
+                  type: string
+                  description: why this data is needed for the current answer
+                data_requested:
+                  type: string
+                  description: which private data is requested
+              required: [reason, data_requested]

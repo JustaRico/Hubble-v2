@@ -1,0 +1,7 @@
+# Hubble web profile patch — adds the escalation tool plugin row to the host
+# composition. Mounted via the dsh.profile bundles mechanism: this file is
+# copied into the profile's cordis.patch.yml by scripts/install_hubble_plugins.sh.
+
+- insert:
+    - id: hubble-escalation-tool
+      name: '@hubble/plugin-escalation-tool'

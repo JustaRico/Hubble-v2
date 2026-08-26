@@ -1,0 +1,9 @@
+# Hubble profile patch — mounted via --patch (or the profile's cordis.patch.yml
+# includes it). Adds the Hubble escalation tool registration to the HOST plane.
+#
+# The tool itself is a first-party-style plugin: we vendor a tiny local package
+# in this directory and reference it by absolute path so the loader finds it.
+
+- insert:
+    - id: hubble-escalation-tool
+      name: '@hubble/plugin-escalation-tool'

@@ -1,0 +1,8 @@
+{
+  "name": "@hubble/plugin-escalation-tool",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hubble Phase 7: registers the request_private_data model tool (handler wired by Phase 8 escalation plugin)",
+  "main": "lib/index.js"
+}

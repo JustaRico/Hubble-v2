@@ -1,0 +1,6 @@
+# Hubble home-level patch (applies over every profile layer).
+# Inserts the Hubble escalation tool into the composition.
+
+- insert:
+    - id: hubble-escalation-tool
+      name: /opt/hubble/escalation-tool/lib/index.js
