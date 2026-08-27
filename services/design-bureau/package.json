@@ -1,0 +1,15 @@
+{
+  "name": "hubble-design-bureau",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hubble Design Bureau — Planner dispatches Designer/Coder builders in parallel via Promise.allSettled + JobUtility, artifacts pass-by-reference in the DMZ (Phase 10)",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}

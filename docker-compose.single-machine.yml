@@ -122,6 +122,34 @@ services:
     networks:
       - hubble-net
 
+  # ── Phase 10: Design Bureau ──────────────────────────────────────────────
+  design-bureau:
+    build:
+      context: ./services/design-bureau
+      dockerfile: Dockerfile
+    image: hubble/design-bureau:latest
+    container_name: hubble-design-bureau
+    restart: unless-stopped
+    ports:
+      - "${HUBBLE_DESIGN_BUREAU_PORT:-8813}:8813"
+    environment:
+      - HUBBLE_DESIGN_BUREAU_PORT=8813
+      - LITELLM_URL=http://hubble-litellm:4000/v1
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - HUBBLE_PLANNER_MODEL=${HUBBLE_PLANNER_MODEL:-planner-model}
+      - HUBBLE_CODER_MODEL=${HUBBLE_CODER_MODEL:-coder-model}
+      - HUBBLE_DESIGNER_MODEL=${HUBBLE_DESIGNER_MODEL:-designer-model}
+      - HUBBLE_DMZ_URL=http://hubble-copyparty-dmz:3923/dmz
+      - HUBBLE_DMZ_USER=${DMZ_USER:-hubble}
+      - HUBBLE_DMZ_PASS=${DMZ_PASS}
+      - HUBBLE_BUREAU_BRANCH_TIMEOUT_MS=${HUBBLE_BUREAU_BRANCH_TIMEOUT_MS:-300000}
+      - HUBBLE_ALLOW_TEST_CONTROLS=true
+    depends_on:
+      - litellm-gateway
+      - copyparty-dmz
+    networks:
+      - hubble-net
+
   # ── Phase 6: DSH orchestrator (containerized) ────────────────────────────
   dsh-instance:
     image: hubble/dsh:latest
