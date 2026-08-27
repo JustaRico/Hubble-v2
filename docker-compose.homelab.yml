@@ -1,0 +1,156 @@
+# Hubble 2.0 — Homelab tier (Zone 1, always-on control plane).
+# Target state after the multi-machine split. Runs on its own low-power box;
+# reaches Workstation services through the Wake Gateway.
+#
+# Same services as their single-machine definitions (config unchanged); only
+# ports/networks move. Post-split steps are in BUILD_GUIDE.md "Multi-Machine
+# Split": join NetBird, flip SAME_HOST_MODE=false with the Workstation MAC,
+# point Wake Gateway targets at the Workstation's NetBird IP.
+
+services:
+  copyparty-dmz:
+    image: copyparty/ac:latest
+    container_name: hubble-copyparty-dmz
+    restart: unless-stopped
+    ports:
+      - "${DMZ_PORT:-13923}:3923"
+    volumes:
+      - ./data/dmz:/mnt/storage/shared-dmz
+    command:
+      - "-a"
+      - "hubble:${DMZ_PASS}"
+      - "-v"
+      - "/mnt/storage/shared-dmz:/dmz:rwd,hubble"
+    networks:
+      - hubble-net
+
+  litellm-gateway:
+    image: ghcr.io/berriai/litellm:main-stable
+    container_name: hubble-litellm
+    restart: unless-stopped
+    ports:
+      - "${LITELLM_PORT:-14000}:4000"
+    volumes:
+      - ./config/litellm/config.yaml:/app/config.yaml:ro
+    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    environment:
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      # post-split: llama-swap lives on the Workstation (NetBird IP)
+      - LITELLM_LLAMA_SWAP_URL_V1=${WORKSTATION_NETBIRD_IP:?set in .env}:10123/v1
+    networks:
+      - hubble-net
+
+  wake-gateway:
+    image: hubble/wake-gateway:latest
+    container_name: hubble-wake-gw
+    restart: unless-stopped
+    ports:
+      - "${WAKE_GW_PORT:-8811}:8811"
+    environment:
+      - WAKE_GW_PORT=8811
+      - SAME_HOST_MODE=false           # real WoL now
+      - WORKSTATION_MAC=${WORKSTATION_MAC:?set in .env}
+      - WORKSTATION_BROADCAST=${WORKSTATION_BROADCAST:-255.255.255.255}
+      - WOL_PORT=${WOL_PORT:-9}
+      - LLAMA_SWAP_TARGET=http://${WORKSTATION_NETBIRD_IP}:10123
+      - SEARXNG_TARGET=http://${WORKSTATION_NETBIRD_IP}:8180
+      - FIRECRAWL_TARGET=http://${WORKSTATION_NETBIRD_IP}:3002
+      - MCPHUB_TARGET=http://${WORKSTATION_NETBIRD_IP}:13100
+    network_mode: host                 # WoL must send on the physical LAN IF
+    networks:
+      - hubble-net
+
+  escalation:
+    image: hubble/escalation:latest
+    container_name: hubble-escalation
+    restart: unless-stopped
+    ports:
+      - "${HUBBLE_ESCALATION_PORT:-8812}:8812"
+    environment:
+      - HUBBLE_ESCALATION_PORT=8812
+      - LITELLM_URL=http://hubble-litellm:4000/v1
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - HUBBLE_PI_MODEL=${HUBBLE_PI_MODEL:-pi-model}
+      - HUBBLE_APPROVAL_TIMEOUT_MS=${HUBBLE_APPROVAL_TIMEOUT_MS:-120000}
+      - HUBBLE_PI_HISTORY_WINDOW=${HUBBLE_PI_HISTORY_WINDOW:-8}
+      - HUBBLE_ALLOW_TEST_CONTROLS=false
+      - AUDIT_DIR=/app/data/audit
+    volumes:
+      - ./data/audit:/app/data/audit
+    depends_on:
+      - litellm-gateway
+    networks:
+      - hubble-net
+
+  design-bureau:
+    image: hubble/design-bureau:latest
+    container_name: hubble-design-bureau
+    restart: unless-stopped
+    ports:
+      - "${HUBBLE_DESIGN_BUREAU_PORT:-8813}:8813"
+    environment:
+      - HUBBLE_DESIGN_BUREAU_PORT=8813
+      - LITELLM_URL=http://hubble-litellm:4000/v1
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - HUBBLE_PLANNER_MODEL=${HUBBLE_PLANNER_MODEL:-planner-model}
+      - HUBBLE_CODER_MODEL=${HUBBLE_CODER_MODEL:-coder-model}
+      - HUBBLE_DESIGNER_MODEL=${HUBBLE_DESIGNER_MODEL:-designer-model}
+      - HUBBLE_DMZ_URL=http://hubble-copyparty-dmz:3923/dmz
+      - HUBBLE_DMZ_USER=${DMZ_USER:-hubble}
+      - HUBBLE_DMZ_PASS=${DMZ_PASS}
+      - HUBBLE_BUREAU_BRANCH_TIMEOUT_MS=${HUBBLE_BUREAU_BRANCH_TIMEOUT_MS:-300000}
+      - HUBBLE_ALLOW_TEST_CONTROLS=false
+    depends_on:
+      - litellm-gateway
+      - copyparty-dmz
+    networks:
+      - hubble-net
+
+  research-bureau:
+    image: hubble/research-bureau:latest
+    container_name: hubble-research-bureau
+    restart: unless-stopped
+    ports:
+      - "${HUBBLE_RESEARCH_PORT:-8814}:8814"
+    environment:
+      - HUBBLE_RESEARCH_PORT=8814
+      - LITELLM_URL=http://hubble-litellm:4000/v1
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - HUBBLE_RESEARCH_MODEL=${HUBBLE_RESEARCH_MODEL:-research-model}
+      - SEARXNG_TARGET=http://${WORKSTATION_NETBIRD_IP}:8180
+      - FIRECRAWL_TARGET=http://${WORKSTATION_NETBIRD_IP}:3002
+      - HUBBLE_DMZ_URL=http://hubble-copyparty-dmz:3923/dmz
+      - HUBBLE_DMZ_USER=${DMZ_USER:-hubble}
+      - HUBBLE_DMZ_PASS=${DMZ_PASS}
+      - HUBBLE_RESEARCH_MAX_ROUNDS=${HUBBLE_RESEARCH_MAX_ROUNDS:-6}
+      - HUBBLE_RESEARCH_ROUND_TIMEOUT_MS=${HUBBLE_RESEARCH_ROUND_TIMEOUT_MS:-120000}
+      - HUBBLE_ALLOW_TEST_CONTROLS=false
+    depends_on:
+      - litellm-gateway
+      - copyparty-dmz
+    networks:
+      - hubble-net
+
+  dsh-instance:
+    image: hubble/dsh:latest
+    container_name: hubble-dsh
+    restart: unless-stopped
+    ports:
+      - "${HUBBLE_DSH_PORT:-3080}:80"
+    environment:
+      - DSH_HOME=/data/dsh-home
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - DSH_BASIC_AUTH_B64=${DSH_BASIC_AUTH_B64}
+    volumes:
+      - ./data/dsh-home:/data/dsh-home
+    networks:
+      - hubble-net
+
+networks:
+  hubble-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${HUBBLE_NET_SUBNET:-172.31.99.0/24}

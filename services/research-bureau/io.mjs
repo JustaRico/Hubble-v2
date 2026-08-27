@@ -38,10 +38,19 @@ export function makeDefaultIo(cfg) {
         { role: "system", content:
           "You are the Hubble Research Bureau query planner. Given the research question and " +
           "the current report digest, output ONLY JSON: {\"query\": \"<web search query>\", \"rationale\": \"<one line>\"}. " +
-          "Pick a query that fills the biggest gap in the digest." },
+          "Pick a query that fills the biggest gap in the digest. If the digest says no evidence was " +
+          "found yet, try a DIFFERENT, simpler or better-known phrasing of the question." },
         { role: "user", content: `Question: ${question}\nDigest so far: ${digest || "(empty)"}` },
       ], 400);
-      return parseJson(raw) ?? { query: question, rationale: "fallback: unparseable planner output" };
+      const parsed = parseJson(raw);
+      if (parsed?.query) return parsed;
+      // deterministic fallbacks: vary the phrasing per attempt so repeated
+      // rounds do not repeat a failing query
+      const n = (digest.match(/\nNEW:/g) ?? []).length + 1;
+      return {
+        query: `${question} explained${n > 1 ? ` simple guide part ${n}` : ""}`,
+        rationale: "fallback: unparseable planner output",
+      };
     },
 
     /** SearXNG JSON search. */
@@ -85,16 +94,24 @@ export function makeDefaultIo(cfg) {
           { role: "system", content:
             "You are the Hubble Research Bureau analyst. From the SEARCH EVIDENCE below output ONLY JSON: " +
             "{\"findings\": [\"...\"], \"sources\": [\"url\"], \"sufficient\": true|false}. " +
-            "sufficient=true only when the evidence fully answers the question." },
+            "Extract concrete facts from the evidence — never answer that no evidence exists if any " +
+            "snippet or page text is present. sufficient=true only when the evidence fully answers the question." },
           { role: "user", content: `Question: ${question}\nQuery tried: ${plan.query}\nEvidence:\n${evidence}` },
         ], 900));
       } catch { /* falls through to empty observation */ }
       if (!parsed || typeof parsed !== "object") parsed = {};
       // hard-bound findings to keep the reconstructed state compact
+      const findings = (Array.isArray(parsed.findings) ? parsed.findings : []).slice(0, 5).map(String);
+      // If the model claims no evidence but search results exist, salvage the
+      // snippets directly as findings (defends against analyst under-extraction)
+      const salvaged = findings.length === 0 && searchRes.results.length > 0
+        ? searchRes.results.slice(0, 3).map((r) => `${r.title}: ${r.snippet}`)
+        : [];
       return {
-        findings: (Array.isArray(parsed.findings) ? parsed.findings : []).slice(0, 5).map(String),
+        findings: findings.length > 0 ? findings : salvaged,
         sources: (Array.isArray(parsed.sources) ? parsed.sources : []).slice(0, 5).map(String),
-        sufficient: !!parsed.sufficient,
+        // never declare sufficiency on a round that produced nothing
+        sufficient: !!parsed.sufficient && (findings.length > 0 || salvaged.length > 0),
       };
     },
 

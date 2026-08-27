@@ -1,0 +1,54 @@
+# Hubble 2.0 — Workstation tier (Zone 2, on-demand compute & vault).
+# Target state after the multi-machine split: woken via Wake-on-LAN by the
+# Homelab's Wake Gateway, joins NetBird on boot. Shares names/ports with the
+# single-machine definitions so accumulated tests pass unmodified.
+
+services:
+  llama-swap:
+    image: ghcr.io/mostlygeek/llama-swap:unified-cuda
+    container_name: hubble-llama-swap
+    restart: unless-stopped
+    ports:
+      - "10123:8080"
+    volumes:
+      # same layout as this run's existing deployment; adjust paths to the box
+      - ${LLAMA_SWAP_CONFIG}:/etc/llama-swap/config/config.yaml
+      - ${LLAMA_SWAP_MODELS_DIR}:/models
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: ["gpu"]
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: hubble-searxng
+    restart: unless-stopped
+    ports:
+      - "${SEARXNG_PORT:-8180}:8080"
+    volumes:
+      - ./config/searxng:/etc/searxng:ro
+
+  mcphub:
+    image: samanhappy/mcphub:latest
+    container_name: hubble-mcphub
+    restart: unless-stopped
+    ports:
+      - "${MCPHUB_PORT:-13100}:3000"
+    environment:
+      - MCPHUB_CONFIG=/app/mcp_settings.json
+      - JWT_SECRET=${MCPHUB_JWT_SECRET}
+    volumes:
+      - ./config/mcphub/mcp_settings.json:/app/mcp_settings.json
+      - ./plugins/file-scanner-mcp:/app/scanner:ro
+      - ${FILE_SCANNER_HOST_DIR}:/data/dmz:ro
+
+  # Firecrawl is its own compose deployment (redis/rabbitmq/postgres/etc.) —
+  # reuse this run's existing one; pin its API port on the Workstation LAN and
+  # leave it reachable at ${WORKSTATION_NETBIRD_IP}:3002 for the Wake Gateway.
+
+networks:
+  default:
+    name: hubble-workstation-net

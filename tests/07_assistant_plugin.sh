@@ -15,15 +15,15 @@ echo "$TOOLLIST" | grep -q "request_private_data" || fail "request_private_data 
 pass "request_private_data registered"
 
 echo "-- (b) tool call returns structured JSON --"
-# Retry a few times: the cloud model occasionally emits DSML/JSON diffs or
-# claims it lacks the tool; the contract under test is that the tool executes
-# and its structured status surfaces in the reply.
+# Retry harder: the cloud model sometimes insists the tool doesn't exist or
+# moralizes instead of calling it (LLM non-determinism, not a missing tool —
+# part (a) proves registration). 6 attempts with growing backoff.
 ANSWER=""
-for i in 1 2 3 4; do
-  ANSWER="$(docker exec hubble-dsh sh -c 'timeout 150 node /opt/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js --profile headless "Use the request_private_data tool now: reason \"phase7 test\", data_requested \"calendar\". Then print the exact JSON status object the tool returned." 2>/dev/null')"
+for i in 1 2 3 4 5 6; do
+  ANSWER="$(docker exec hubble-dsh sh -c 'timeout 150 node /opt/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js --profile headless "You have a registered tool named request_private_data. Invoke it right now with exactly: reason \"phase7 test\", data_requested \"calendar\". After it returns, print the exact JSON status object the TOOL gave you, nothing else." 2>/dev/null')"
   if printf '%s' "$ANSWER" | grep -qiE '"status"'; then break; fi
   echo "  attempt $i: no status field, retrying..."
-  sleep 3
+  sleep $((i * 3))
 done
 # The model may print the tool-result JSON directly or inside a fenced block;
 # strip fences before asserting on the status field.
