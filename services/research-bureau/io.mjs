@@ -53,19 +53,33 @@ export function makeDefaultIo(cfg) {
       };
     },
 
-    /** SearXNG JSON search. */
+    /** SearXNG JSON search. Multi-engine with fallback: DuckDuckGo
+     * intermittently CAPTCHAs self-hosted instances, so the default
+     * !general engine mix can return zero results — pin a resilient set
+     * (bing first, wikipedia/google as backups) and verify non-empty. */
     async search(query) {
-      const res = await fetch(`${cfg.searxngBase}/search?q=${encodeURIComponent(query)}&format=json`, {
-        signal: AbortSignal.timeout(60000),
-      });
-      if (!res.ok) throw new Error(`searxng HTTP ${res.status}`);
-      const body = await res.json();
-      return {
-        query,
-        results: (body.results ?? []).slice(0, 8).map((r) => ({
-          url: r.url, title: r.title ?? "", snippet: (r.content ?? "").slice(0, 300),
-        })),
+      const engines = "bing,wikipedia,google,ddg";
+      const doSearch = async (q) => {
+        const res = await fetch(
+          `${cfg.searxngBase}/search?q=${encodeURIComponent(q)}&format=json&engines=${engines}`,
+          { signal: AbortSignal.timeout(60000) },
+        );
+        if (!res.ok) throw new Error(`searxng HTTP ${res.status}`);
+        const body = await res.json();
+        return {
+          query: q,
+          results: (body.results ?? []).slice(0, 8).map((r) => ({
+            url: r.url, title: r.title ?? "", snippet: (r.content ?? "").slice(0, 300),
+          })),
+        };
       };
+      let out = await doSearch(query);
+      if (out.results.length === 0) {
+        // zero-result resilience: strip to core terms and retry once
+        const stripped = query.replace(/[^a-zA-Z0-9 ]/g, " ").replace(/\s+/g, " ").trim();
+        if (stripped && stripped !== query) out = await doSearch(stripped);
+      }
+      return out;
     },
 
     /** Firecrawl full-page markdown extraction for one promising URL. */
