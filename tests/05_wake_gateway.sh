@@ -89,8 +89,18 @@ PYEOF
 pass "SSE streamed incrementally ($(cat "$SSE_FILE"))"
 
 echo "-- (d) regression: phases 01-04 --"
+# Each nested test's full log is kept in temp/ so a failure is diagnosable
+# from the failure message itself instead of "run it directly for details".
+FAIL_LOG="$TEMP_DIR/regression-05-last-failure.txt"
+: > "$FAIL_LOG"
 for t in 01_dmz.sh 02_llama_swap.sh 03_litellm.sh 04_aux_services.sh; do
-  bash "$(dirname "$0")/$t" > /dev/null 2>&1 || fail "regression: $t failed (run it directly for details)"
+  LOG="$TEMP_DIR/regression-05-$t.log"
+  if ! bash "$(dirname "$0")/$t" > "$LOG" 2>&1; then
+    { echo "== nested regression failed in $t (from tests/05_wake_gateway.sh) ==";
+      tail -n 25 "$LOG"; } > "$FAIL_LOG" 2>&1
+    fail "regression: $t failed; details:
+$(cat "$FAIL_LOG")"
+  fi
 done
 pass "regression 01-04 green"
 

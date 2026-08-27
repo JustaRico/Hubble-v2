@@ -1,12 +1,18 @@
 # Hubble LiteLLM gateway — one model-access point for every Hubble plugin.
 # Aliases (spec section 7): assistant-model, pi-model; bureau aliases join in
 # Phase 10/11. Nothing talks to OpenRouter or llama-swap directly.
+#
+# NOTE: the assistant alias pins the DATED slug deepseek/deepseek-v4-flash-0731
+# because OpenRouter's data-policy guardrails began 404-ing the bare slug
+# ("No endpoints available matching your guardrail restrictions and data
+# policy"). The dated -0731 endpoint serves 200. Keep both in sync with
+# data/dsh-home/settings.yaml (DSH's own provider route).
 
 model_list:
   # ── cloud: DeepSeek-V4-Flash via OpenRouter ─────────────────────────────
   - model_name: assistant-model
     litellm_params:
-      model: openrouter/deepseek/deepseek-v4-flash
+      model: openrouter/deepseek/deepseek-v4-flash-0731
       api_key: os.environ/OPENROUTER_API_KEY
 
   # ── local: PI / local-builder tier via the existing llama-swap ──────────

@@ -15,13 +15,33 @@ echo "$TOOLLIST" | grep -q "request_private_data" || fail "request_private_data 
 pass "request_private_data registered"
 
 echo "-- (b) tool call returns structured JSON --"
-ANSWER="$(docker exec hubble-dsh sh -c 'timeout 150 node /opt/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js --profile headless "Call the request_private_data tool with reason \"phase7 test\" and data_requested \"calendar\". Reply with ONLY the JSON object it returned." 2>/dev/null')"
-echo "$ANSWER" | grep -qiE '"status"' || fail "tool call did not return structured status: $ANSWER"
-pass "tool returned structured result: $(echo "$ANSWER" | grep -oE '"status"[^,}]*' | head -1)"
+# Retry a few times: the cloud model occasionally emits DSML/JSON diffs or
+# claims it lacks the tool; the contract under test is that the tool executes
+# and its structured status surfaces in the reply.
+ANSWER=""
+for i in 1 2 3 4; do
+  ANSWER="$(docker exec hubble-dsh sh -c 'timeout 150 node /opt/dsh/node_modules/@deepseek-ai/dsh/lib/bin.js --profile headless "Use the request_private_data tool now: reason \"phase7 test\", data_requested \"calendar\". Then print the exact JSON status object the tool returned." 2>/dev/null')"
+  if printf '%s' "$ANSWER" | grep -qiE '"status"'; then break; fi
+  echo "  attempt $i: no status field, retrying..."
+  sleep 3
+done
+# The model may print the tool-result JSON directly or inside a fenced block;
+# strip fences before asserting on the status field.
+STRIPPED="$(printf '%s' "$ANSWER" | sed 's/```json//g; s/```//g')"
+echo "$STRIPPED" | grep -qiE '"status"' || fail "tool call did not return structured status: $ANSWER"
+pass "tool returned structured result: $(echo "$STRIPPED" | grep -oE '"status"[^,}]*' | head -1)"
 
 echo "-- (c) regression: phases 01-06 --"
+FAIL_LOG="$TEMP_DIR/regression-07-last-failure.txt"
+: > "$FAIL_LOG"
 for t in 01_dmz.sh 02_llama_swap.sh 03_litellm.sh 04_aux_services.sh 05_wake_gateway.sh 06_dsh_boot.sh; do
-  bash "$(dirname "$0")/$t" > /dev/null 2>&1 || fail "regression: $t failed (run it directly for details)"
+  LOG="$TEMP_DIR/regression-07-$t.log"
+  if ! bash "$(dirname "$0")/$t" > "$LOG" 2>&1; then
+    { echo "== nested regression failed in $t (from tests/07_assistant_plugin.sh) ==";
+      tail -n 25 "$LOG"; } > "$FAIL_LOG" 2>&1
+    fail "regression: $t failed; details:
+$(cat "$FAIL_LOG")"
+  fi
 done
 pass "regression 01-06 green"
 

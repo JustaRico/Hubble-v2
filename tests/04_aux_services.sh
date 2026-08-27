@@ -53,9 +53,17 @@ RESULT="$(curl -s --max-time 15 -X POST "$MCPHUB/mcp" \
 echo "$RESULT" | grep -q 'data:.*root.\{0,8\}/data/dmz' || fail "tool call failed"
 pass "tool executed and listed the DMZ"
 
-echo "-- (d) regression: phases 1-3 --"
+echo "-- (d) regression: phases 01-03 --"
+FAIL_LOG="$TEMP_DIR/regression-04-last-failure.txt"
+: > "$FAIL_LOG"
 for t in 01_dmz.sh 02_llama_swap.sh 03_litellm.sh; do
-  bash "$(dirname "$0")/$t" > /dev/null 2>&1 || fail "regression: $t failed (run it directly for details)"
+  LOG="$TEMP_DIR/regression-04-$t.log"
+  if ! bash "$(dirname "$0")/$t" > "$LOG" 2>&1; then
+    { echo "== nested regression failed in $t (from tests/04_aux_services.sh) ==";
+      tail -n 25 "$LOG"; } > "$FAIL_LOG" 2>&1
+    fail "regression: $t failed; details:
+$(cat "$FAIL_LOG")"
+  fi
 done
 pass "regression 01-03 green"
 

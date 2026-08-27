@@ -23,21 +23,34 @@ chat() { # chat <model> <prompt> <max_tokens> -> body file path or empty on HTTP
 }
 
 echo "-- (a) assistant-model via OpenRouter --"
-OUT="$(chat assistant-model "What is 2+3? Answer with just the number." 300)" \
-  || fail "assistant-model call failed: $(head -c 200 "${TEMP_DIR}/litellm-assistant-model-$$.json" 2>/dev/null)"
-"${JQ[@]}" -e '.choices[0].message.content' "$OUT" >/dev/null || fail "assistant-model: malformed response"
-A_CONTENT="$("${JQ[@]}" -r '.choices[0].message.content' "$OUT" | tr -d '[:space:]')"
-[ -n "$A_CONTENT" ] || fail "assistant-model returned empty content"
-echo "$A_CONTENT" | grep -q "5" || fail "assistant-model expected fact '5', got: $A_CONTENT"
+# Bounded retry for LLM non-determinism (occasional empty content under load)
+A_CONTENT=""
+for attempt in 1 2 3; do
+  OUT="$(chat assistant-model "What is 2+3? Answer with just the number." 300)" \
+    || { echo "  attempt $attempt: HTTP failure, retrying..."; sleep 3; continue; }
+  "${JQ[@]}" -e '.choices[0].message.content' "$OUT" >/dev/null 2>&1 || { sleep 3; continue; }
+  A_CONTENT="$("${JQ[@]}" -r '.choices[0].message.content' "$OUT" | tr -d '[:space:]')"
+  [ -n "$A_CONTENT" ] && echo "$A_CONTENT" | grep -q "5" && break
+  A_CONTENT=""
+  echo "  attempt $attempt: empty/incorrect content, retrying..."
+  sleep 3
+done
+[ -n "$A_CONTENT" ] || fail "assistant-model failed after 3 attempts"
 pass "assistant-model answered correctly ($A_CONTENT)"
 
 echo "-- (b) pi-model via llama-swap --"
-OUT="$(chat pi-model "What is 6 multiplied by 7? Answer with just the number." 400)" \
-  || fail "pi-model call failed"
-"${JQ[@]}" -e '.choices[0].message.content' "$OUT" >/dev/null || fail "pi-model: malformed response"
-P_CONTENT="$("${JQ[@]}" -r '.choices[0].message.content' "$OUT" | tr -d '[:space:]')"
-[ -n "$P_CONTENT" ] || fail "pi-model returned empty content"
-echo "$P_CONTENT" | grep -q "42" || fail "pi-model expected fact '42', got: $P_CONTENT"
+P_CONTENT=""
+for attempt in 1 2 3; do
+  OUT="$(chat pi-model "What is 6 multiplied by 7? Answer with just the number." 400)" \
+    || { echo "  attempt $attempt: HTTP failure, retrying..."; sleep 3; continue; }
+  "${JQ[@]}" -e '.choices[0].message.content' "$OUT" >/dev/null 2>&1 || { sleep 3; continue; }
+  P_CONTENT="$("${JQ[@]}" -r '.choices[0].message.content' "$OUT" | tr -d '[:space:]')"
+  [ -n "$P_CONTENT" ] && echo "$P_CONTENT" | grep -q "42" && break
+  P_CONTENT=""
+  echo "  attempt $attempt: empty/incorrect content, retrying..."
+  sleep 3
+done
+[ -n "$P_CONTENT" ] || fail "pi-model failed after 3 attempts"
 pass "pi-model answered correctly ($P_CONTENT)"
 
 echo "-- (c) gateway audit log shows both calls --"

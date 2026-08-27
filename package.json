@@ -6,5 +6,8 @@
   "type": "module",
   "scripts": {
     "test": "bash tests/run_tests.sh"
+  },
+  "dependencies": {
+    "zod": "^4.4.3"
   }
 }

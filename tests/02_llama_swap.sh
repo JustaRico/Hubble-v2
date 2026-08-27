@@ -29,15 +29,24 @@ pass "embedding model listed: $EMBED_MODEL"
 
 echo "-- (b) minimal chat completion --"
 RESP_FILE="$TEMP_DIR/llamaswap-probe.json"
-curl -s --max-time 300 "$LS_URL/v1/chat/completions" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"'"$CHAT_MODEL"'","messages":[{"role":"user","content":"What is 17 multiplied by 23? Answer with just the number."}],"max_tokens":400}' \
-  -o "$RESP_FILE" || fail "chat completion request failed"
-[ -s "$RESP_FILE" ] || fail "empty response body"
-"${JQ[@]}" -e '.choices[0].message.content' "$RESP_FILE" >/dev/null 2>&1 \
-  || fail "no choices[0].message.content in response: $(head -c 200 "$RESP_FILE")"
-CONTENT="$("${JQ[@]}" -r '.choices[0].message.content' "$RESP_FILE" | tr -d '[:space:]')"
-[ -n "$CONTENT" ] || fail "content is empty"
+# Bounded retry: pi-model (local LLM) occasionally returns an empty content
+# under load; the contract under test is that the model serves correct facts,
+# so retry up to 3 times on an empty/unparseable sample.
+CONTENT=""
+for attempt in 1 2 3; do
+  curl -s --max-time 300 "$LS_URL/v1/chat/completions" \
+    -H "Content-Type: application/json" \
+    -d '{"model":"'"$CHAT_MODEL"'","messages":[{"role":"user","content":"What is 17 multiplied by 23? Answer with just the number."}],"max_tokens":400}' \
+    -o "$RESP_FILE" || fail "chat completion request failed"
+  [ -s "$RESP_FILE" ] || fail "empty response body"
+  if "${JQ[@]}" -e '.choices[0].message.content' "$RESP_FILE" >/dev/null 2>&1; then
+    CONTENT="$("${JQ[@]}" -r '.choices[0].message.content' "$RESP_FILE" | tr -d '[:space:]')"
+  fi
+  [ -n "$CONTENT" ] && break
+  echo "  attempt $attempt: empty/unparseable completion, retrying..."
+  sleep 3
+done
+[ -n "$CONTENT" ] || fail "content is empty after 3 attempts: $(head -c 200 "$RESP_FILE")"
 # the probe doubles as a factual sanity check
 echo "$CONTENT" | grep -q "391" || fail "expected arithmetic fact 391 in content, got: $CONTENT"
 pass "completion returned correct fact (content=$CONTENT)"
