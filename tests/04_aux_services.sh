@@ -14,7 +14,9 @@ MCPHUB="http://localhost:${MCPHUB_PORT:-13100}"
 
 echo "-- (a) SearXNG JSON search --"
 SX_FILE="$TEMP_DIR/searxng-test.json"
-curl -s --max-time 30 "$SEARXNG/search?q=hubble+telescope&format=json" -o "$SX_FILE"
+# duckduckgo (the default engine mix) intermittently CAPTCHAs self-hosted
+# instances; pin a resilient engine set for the test as the research bureau does
+curl -s --max-time 30 "$SEARXNG/search?q=hubble+telescope&format=json&engines=bing,wikipedia,google,ddg" -o "$SX_FILE"
 [ "$(http_code "$SEARXNG/search?q=test&format=json")" = "200" ] || fail "SearXNG not reachable at $SEARXNG"
 RESULT_COUNT="$("${JQ[@]}" '.results | length' "$SX_FILE")"
 [ "${RESULT_COUNT:-0}" -ge 1 ] || fail "SearXNG returned no results"

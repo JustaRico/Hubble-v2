@@ -32,6 +32,37 @@ model_list:
       api_base: os.environ/LITELLM_LLAMA_SWAP_URL_V1
       api_key: none
 
+  # ── Phase 10/11: bureau tier ────────────────────────────────────────────
+  # Design Bureau roles. Coder prefers the cloud model (better code); a
+  # coder-model-local alias exists for fallback work on gemma4-12b.
+  # Designer + Research run locally: designer is a formatting/layout task the
+  # small model handles fine, and Research makes many small per-round calls.
+  - model_name: planner-model
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4-flash-0731
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: coder-model
+    litellm_params:
+      model: openrouter/deepseek/deepseek-v4-flash-0731
+      api_key: os.environ/OPENROUTER_API_KEY
+  - model_name: coder-model-local
+    litellm_params:
+      model: openai/gemma4-12b
+      api_base: os.environ/LITELLM_LLAMA_SWAP_URL_V1
+      api_key: none
+  - model_name: designer-model
+    litellm_params:
+      model: openai/gemma4-12b
+      api_base: os.environ/LITELLM_LLAMA_SWAP_URL_V1
+      api_key: none
+
+  # ── Phase 11: Research Bureau per-round calls (many small completions) ──
+  - model_name: research-model
+    litellm_params:
+      model: openai/gemma4-12b
+      api_base: os.environ/LITELLM_LLAMA_SWAP_URL_V1
+      api_key: none
+
 litellm_settings:
   # audit trail: every call logged with model + tokens (spec: "audit logging")
   set_verbose: false
