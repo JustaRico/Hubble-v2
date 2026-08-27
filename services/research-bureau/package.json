@@ -1,0 +1,15 @@
+{
+  "name": "hubble-research-bureau",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Hubble Research Bureau — IterResearch-style bounded self-looping agent via JobUtility; report artifacts pass-by-reference in the DMZ (Phase 11)",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs",
+    "check": "node --check server.mjs"
+  },
+  "dependencies": {
+    "zod": "^3.23.8"
+  }
+}

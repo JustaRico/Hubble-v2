@@ -150,6 +150,37 @@ services:
     networks:
       - hubble-net
 
+  # ── Phase 11: Research Bureau ────────────────────────────────────────────
+  research-bureau:
+    build:
+      context: ./services/research-bureau
+      dockerfile: Dockerfile
+    image: hubble/research-bureau:latest
+    container_name: hubble-research-bureau
+    restart: unless-stopped
+    ports:
+      - "${HUBBLE_RESEARCH_PORT:-8814}:8814"
+    environment:
+      - HUBBLE_RESEARCH_PORT=8814
+      - LITELLM_URL=http://hubble-litellm:4000/v1
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - HUBBLE_RESEARCH_MODEL=${HUBBLE_RESEARCH_MODEL:-research-model}
+      - SEARXNG_TARGET=http://hubble-searxng:8080
+      - FIRECRAWL_TARGET=${FIRECRAWL_URL}
+      - FIRECRAWL_API_KEY=${FIRECRAWL_API_KEY:-}
+      - HUBBLE_DMZ_URL=http://hubble-copyparty-dmz:3923/dmz
+      - HUBBLE_DMZ_USER=${DMZ_USER:-hubble}
+      - HUBBLE_DMZ_PASS=${DMZ_PASS}
+      - HUBBLE_RESEARCH_MAX_ROUNDS=${HUBBLE_RESEARCH_MAX_ROUNDS:-6}
+      - HUBBLE_RESEARCH_ROUND_TIMEOUT_MS=${HUBBLE_RESEARCH_ROUND_TIMEOUT_MS:-120000}
+      - HUBBLE_ALLOW_TEST_CONTROLS=true
+    depends_on:
+      - litellm-gateway
+      - searxng
+      - copyparty-dmz
+    networks:
+      - hubble-net
+
   # ── Phase 6: DSH orchestrator (containerized) ────────────────────────────
   dsh-instance:
     image: hubble/dsh:latest
